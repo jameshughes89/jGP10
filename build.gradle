@@ -1,0 +1,30 @@
+plugins {
+    id 'java'
+}
+
+group   = 'jgp'
+version = '0.1.0-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testImplementation 'nl.jqno.equalsverifier:equalsverifier:3.17.5'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+    }
+}
