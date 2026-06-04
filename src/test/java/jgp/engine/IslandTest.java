@@ -1,9 +1,9 @@
 package jgp.engine;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Random;
@@ -223,7 +223,14 @@ public class IslandTest {
                 new Individual(ARBITRARY_CHROMOSOME_FACTORY.create(new Random(45)), 0.0),
                 new Individual(ARBITRARY_CHROMOSOME_FACTORY.create(new Random(46)), -100.0) };
         Individual[] next = classUnderTest.run(someIndividuals, 1, () -> new int[] { 0, 1, 2 });
-        assertSame(someIndividuals[4], next[0]);
+
+        // Elitism carries the best individual's fitness and genes into next[0]...
+        assertEquals(-100.0, next[0].fitness());
+        assertArrayEquals(someIndividuals[4].chromosome().genes(), next[0].chromosome().genes());
+        // ...but as a value copy with its OWN buffer, never an aliased reference to the source
+        // chromosome (the aliasing that let later breeding overwrite the elite's genes).
+        assertNotSame(someIndividuals[4], next[0]);
+        assertNotSame(someIndividuals[4].chromosome(), next[0].chromosome());
     }
 
         @Test

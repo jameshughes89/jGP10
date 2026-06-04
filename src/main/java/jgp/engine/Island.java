@@ -70,7 +70,13 @@ public final class Island {
     }
 
     private void nextGeneration(Individual[] population, Individual[] next, int[] rowIndices) {
-        next[0] = findBest(population);
+        // Elitism: copy the best individual's genes into next[0]'s OWN buffer rather than
+        // aliasing the source chromosome (which lives in the other double-buffer array and
+        // would be overwritten by later breeding, leaving stale fitness on garbage genes).
+        Individual best = findBest(population);
+        Chromosome eliteBuffer = next[0].chromosome();
+        eliteBuffer.copyFrom(best.chromosome());
+        next[0] = new Individual(eliteBuffer, best.fitness());
 
         for (int i = 1; i < population.length; i += 2) {
             Individual parentA = selectionStrategy.select(population, random);
@@ -107,27 +113,25 @@ public final class Island {
             return;
         }
 
-        Chromosome childA = parentA;
+        // No crossover: always copy the parent's genes into this slot's OWN buffer (never
+        // alias the parent chromosome, which lives in the other double-buffer array).
+        Chromosome childABuffer = next[i].chromosome();
+        childABuffer.copyFrom(parentA);
         if (mutateChildA) {
-            Chromosome childABuffer = next[i].chromosome();
-            childABuffer.copyFrom(parentA);
             mutationOperator.mutate(childABuffer, random);
-            childA = childABuffer;
         }
-        next[i] = new Individual(childA, evaluator.evaluate(childA, evaluationData, rowIndices));
+        next[i] = new Individual(childABuffer, evaluator.evaluate(childABuffer, evaluationData, rowIndices));
 
         if (!hasPartner) {
             return;
         }
 
-        Chromosome childB = parentB;
+        Chromosome childBBuffer = next[i + 1].chromosome();
+        childBBuffer.copyFrom(parentB);
         if (mutateChildB) {
-            Chromosome childBBuffer = next[i + 1].chromosome();
-            childBBuffer.copyFrom(parentB);
             mutationOperator.mutate(childBBuffer, random);
-            childB = childBBuffer;
         }
-        next[i + 1] = new Individual(childB, evaluator.evaluate(childB, evaluationData, rowIndices));
+        next[i + 1] = new Individual(childBBuffer, evaluator.evaluate(childBBuffer, evaluationData, rowIndices));
     }
 
     private static Individual[] createWorkingPopulation(Individual[] population) {
