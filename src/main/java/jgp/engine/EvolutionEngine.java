@@ -7,6 +7,7 @@ import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.function.Consumer;
 import java.util.function.IntFunction;
 
 import jgp.individual.Individual;
@@ -15,6 +16,9 @@ import java.util.function.Supplier;
 import jgp.predictor.TrainerReplacementCoordinator;
 
 public final class EvolutionEngine implements AutoCloseable {
+
+    private static final Consumer<Individual[][]> NO_OP_MIGRATION_OBSERVER = populations -> {
+    };
 
     private final Island[] islands;
     private final ExecutorService executorService;
@@ -72,7 +76,8 @@ public final class EvolutionEngine implements AutoCloseable {
                 migrationCount,
                 rowIndicesSource,
                 predictorEvolver,
-                null);
+                null,
+                NO_OP_MIGRATION_OBSERVER);
     }
 
     public Individual[][] evolve(Individual[][] islandPopulations,
@@ -81,13 +86,37 @@ public final class EvolutionEngine implements AutoCloseable {
             Supplier<int[]> rowIndicesSource,
             PredictorEvolver predictorEvolver,
             TrainerReplacementCoordinator trainerReplacementCoordinator) {
+        return evolve(islandPopulations,
+                generationsPerMigration,
+                migrationCount,
+                rowIndicesSource,
+                predictorEvolver,
+                trainerReplacementCoordinator,
+                NO_OP_MIGRATION_OBSERVER);
+    }
+
+    /**
+     * Evolves with a fitness-predictor inner loop, invoking {@code migrationObserver} with the freshly
+     * evolved populations after each migration block (before shuffling). The observer lets callers
+     * reconcile subset-based fitness against the whole data set and track a best-over-migrations result,
+     * mirroring the per-migration full-data selection used by jGPv9.
+     */
+    public Individual[][] evolve(Individual[][] islandPopulations,
+            int generationsPerMigration,
+            int migrationCount,
+            Supplier<int[]> rowIndicesSource,
+            PredictorEvolver predictorEvolver,
+            TrainerReplacementCoordinator trainerReplacementCoordinator,
+            Consumer<Individual[][]> migrationObserver) {
         Objects.requireNonNull(trainerReplacementCoordinator, "trainerReplacementCoordinator must not be null");
+        Objects.requireNonNull(migrationObserver, "migrationObserver must not be null");
         return evolveWithPredictor(islandPopulations,
                 generationsPerMigration,
                 migrationCount,
                 rowIndicesSource,
                 predictorEvolver,
-                trainerReplacementCoordinator);
+                trainerReplacementCoordinator,
+                migrationObserver);
     }
 
     private Individual[][] evolveWithPredictor(Individual[][] islandPopulations,
@@ -95,9 +124,11 @@ public final class EvolutionEngine implements AutoCloseable {
             int migrationCount,
             Supplier<int[]> rowIndicesSource,
             PredictorEvolver predictorEvolver,
-            TrainerReplacementCoordinator trainerReplacementCoordinator) {
+            TrainerReplacementCoordinator trainerReplacementCoordinator,
+            Consumer<Individual[][]> migrationObserver) {
         Objects.requireNonNull(rowIndicesSource, "rowIndicesSource must not be null");
         Objects.requireNonNull(predictorEvolver, "predictorEvolver must not be null");
+        Objects.requireNonNull(migrationObserver, "migrationObserver must not be null");
 
         validateCommonEvolveArgs(islandPopulations, generationsPerMigration, migrationCount);
         Individual[][] currentPopulations = clonePopulations(islandPopulations);
@@ -116,6 +147,7 @@ public final class EvolutionEngine implements AutoCloseable {
                 if (trainerReplacementCoordinator != null) {
                     trainerReplacementCoordinator.update(currentPopulations);
                 }
+                migrationObserver.accept(currentPopulations);
                 migrateByShuffle(currentPopulations);
             }
         } finally {

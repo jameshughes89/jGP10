@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
@@ -106,5 +107,36 @@ public class EvolutionCoordinatorTest {
         EvolutionCoordinator classUnderTest = new EvolutionCoordinator(new Island[] { ARBITRARY_ISLAND },
                 ARBITRARY_EXECUTOR_SERVICE, ARBITRARY_EVALUATOR, ARBITRARY_EVALUATION_DATA, 2, 10, 3, new Random(42));
         assertEquals(3, classUnderTest.predictorCoordinator().subsetSize());
+    }
+
+    @Test
+    void bestOnFullData_beforeEvolve_throwsIllegalStateException() {
+        EvolutionCoordinator classUnderTest = new EvolutionCoordinator(new Island[] { ARBITRARY_ISLAND },
+                ARBITRARY_EXECUTOR_SERVICE, ARBITRARY_EVALUATOR, ARBITRARY_EVALUATION_DATA, 2, 10, 3, new Random(42));
+        assertThrows(IllegalStateException.class, classUnderTest::bestOnFullData);
+    }
+
+    @Test
+    void bestOnFullData_afterEvolve_isNoWorseThanFinalPopulationOnFullData() {
+        EvolutionCoordinator classUnderTest = new EvolutionCoordinator(new Island[] { ARBITRARY_ISLAND },
+                ARBITRARY_EXECUTOR_SERVICE, ARBITRARY_EVALUATOR, ARBITRARY_EVALUATION_DATA, 2, 10, 3, new Random(42));
+        Individual[][] finalPopulations = classUnderTest.evolve(ARBITRARY_ISLAND_POPULATIONS, 1, 2);
+
+        Individual best = classUnderTest.bestOnFullData();
+        assertNotNull(best);
+
+        int[] fullRowIndices = { 0, 1, 2 };
+        double minFinalPopulationFullDataFitness = Double.MAX_VALUE;
+        for (Individual[] islandPopulation : finalPopulations) {
+            for (Individual individual : islandPopulation) {
+                double fullDataFitness = ARBITRARY_EVALUATOR.evaluate(individual.chromosome(),
+                        ARBITRARY_EVALUATION_DATA, fullRowIndices);
+                minFinalPopulationFullDataFitness = Math.min(minFinalPopulationFullDataFitness, fullDataFitness);
+            }
+        }
+
+        // The best-over-migrations result is scored on full data and includes the final population,
+        // so it can never be worse than the best individual in the final population on full data.
+        assertTrue(best.fitness() <= minFinalPopulationFullDataFitness + 1e-9);
     }
 }

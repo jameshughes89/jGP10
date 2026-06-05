@@ -1,5 +1,6 @@
 package jgp.app;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -46,14 +47,13 @@ public class RunReportFormatterTest {
                 new VariableGene(0, "v0"),
                 new BinaryGene(BinaryOperator.ADD, 0, 1));
 
-        Individual bestByStoredFitness = new Individual(chromosome, 2.5);
         Individual bestByFullData = new Individual(chromosome, 1.5);
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
         try {
             System.setOut(new PrintStream(output));
-            RunReportFormatter.printSummary(settings, evaluationData, 1_234_000L, bestByStoredFitness, bestByFullData);
+            RunReportFormatter.printSummary(settings, evaluationData, 1_234_000L, bestByFullData);
         } finally {
             System.setOut(originalOut);
         }
@@ -64,7 +64,7 @@ public class RunReportFormatterTest {
         assertTrue(report.contains("rows=2"));
         assertTrue(report.contains("variables=1"));
         assertTrue(report.contains("elapsedMs=1"));
-        assertTrue(report.contains("bestStoredFitness=2.5"));
+        assertFalse(report.contains("bestStoredFitness"));
         assertTrue(report.contains("bestFullDataFitness=1.5"));
         assertTrue(report.contains("bestExpression=(1.000000 + v0)"));
     }

@@ -19,7 +19,6 @@ public final class RunReportFormatter {
     public static void printSummary(AppSettings settings,
             EvaluationData evaluationData,
             long elapsedNanoTime,
-            Individual bestByStoredFitness,
             Individual bestByFullData) {
         System.out.println("=== jGP10 run complete ===");
         System.out.println("csvPath=" + settings.csvPath().toAbsolutePath());
@@ -36,7 +35,6 @@ public final class RunReportFormatter {
         System.out.println("predictorSubsetSize=" + settings.predictorSubsetSize());
         System.out.println("elapsedMs=" + (elapsedNanoTime / 1_000_000L));
         System.out.println();
-        System.out.println("bestStoredFitness=" + bestByStoredFitness.fitness());
         System.out.println("bestFullDataFitness=" + bestByFullData.fitness());
         System.out.println("bestExpression=" + chromosomeToExpression(bestByFullData.chromosome()));
     }

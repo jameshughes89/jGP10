@@ -19,7 +19,12 @@ public final class EvolutionCoordinator implements AutoCloseable {
     private final PredictorCoordinator predictorCoordinator;
     private final PredictorEvolver predictorEvolver;
     private final TrainerReplacementCoordinator trainerReplacementCoordinator;
+    private final Evaluator evaluator;
+    private final EvaluationData evaluationData;
+    private final int[] fullRowIndices;
     private final Random random;
+
+    private Individual bestOnFullData;
 
     public EvolutionCoordinator(Island[] islands,
             ExecutorService executorService,
@@ -29,9 +34,10 @@ public final class EvolutionCoordinator implements AutoCloseable {
             int predictorPopulationSize,
             int predictorSubsetSize,
             Random random) {
-        Objects.requireNonNull(evaluator, "evaluator must not be null");
-        Objects.requireNonNull(evaluationData, "evaluationData must not be null");
+        this.evaluator = Objects.requireNonNull(evaluator, "evaluator must not be null");
+        this.evaluationData = Objects.requireNonNull(evaluationData, "evaluationData must not be null");
         this.random = Objects.requireNonNull(random, "random must not be null");
+        this.fullRowIndices = buildFullRowIndices(evaluationData.rowCount());
 
         this.evolutionEngine = new EvolutionEngine(islands, executorService, random);
         this.trainerManager = new TrainerManager(trainerCount);
@@ -54,12 +60,47 @@ public final class EvolutionCoordinator implements AutoCloseable {
             int generationsPerMigration,
             int migrationCount) {
         trainerManager.initialize(flattenPopulations(islandPopulations), random);
-        return evolutionEngine.evolve(islandPopulations,
+        bestOnFullData = null;
+        Individual[][] evolvedPopulations = evolutionEngine.evolve(islandPopulations,
                 generationsPerMigration,
                 migrationCount,
                 predictorCoordinator,
                 predictorEvolver,
-                trainerReplacementCoordinator);
+                trainerReplacementCoordinator,
+                this::trackBestOnFullData);
+        // Final reconciliation so the best is captured even when migrationCount is zero.
+        trackBestOnFullData(evolvedPopulations);
+        return evolvedPopulations;
+    }
+
+    /**
+     * Returns the best individual seen across all migrations, scored on the whole data set rather than
+     * a predictor subset. Available only after {@link #evolve} has run.
+     */
+    public Individual bestOnFullData() {
+        if (bestOnFullData == null) {
+            throw new IllegalStateException("bestOnFullData is unavailable until evolve has been called");
+        }
+        return bestOnFullData;
+    }
+
+    private void trackBestOnFullData(Individual[][] islandPopulations) {
+        for (Individual[] islandPopulation : islandPopulations) {
+            for (Individual individual : islandPopulation) {
+                double fullDataFitness = evaluator.evaluate(individual.chromosome(), evaluationData, fullRowIndices);
+                if (bestOnFullData == null || fullDataFitness < bestOnFullData.fitness()) {
+                    bestOnFullData = new Individual(individual.chromosome(), fullDataFitness);
+                }
+            }
+        }
+    }
+
+    private static int[] buildFullRowIndices(int rowCount) {
+        int[] rowIndices = new int[rowCount];
+        for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+            rowIndices[rowIndex] = rowIndex;
+        }
+        return rowIndices;
     }
 
     public Individual bestIndividual(Individual[][] islandPopulations) {
