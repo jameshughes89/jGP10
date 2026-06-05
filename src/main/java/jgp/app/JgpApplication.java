@@ -98,19 +98,17 @@ public final class JgpApplication {
                 resolvedSettings.predictorSubsetSize(),
                 random)) {
             long startNanoTime = System.nanoTime();
-            Individual[][] evolvedPopulations = evolutionCoordinator.evolve(initialPopulations,
+            evolutionCoordinator.evolve(initialPopulations,
                     resolvedSettings.generationsPerMigration(),
                     resolvedSettings.migrationCount());
             long elapsedNanoTime = System.nanoTime() - startNanoTime;
 
-            Individual bestByStoredFitness = evolutionCoordinator.bestIndividual(evolvedPopulations);
-            Individual bestByFullData = bestOnFullData(evolvedPopulations, evaluator, evaluationData, fullRowIndices);
+            Individual bestByFullData = evolutionCoordinator.bestOnFullData();
 
             RunReportFormatter.printSummary(
                     resolvedSettings,
                     evaluationData,
                     elapsedNanoTime,
-                    bestByStoredFitness,
                     bestByFullData);
         }
     }
@@ -140,22 +138,5 @@ public final class JgpApplication {
             }
         }
         return populations;
-    }
-
-    private static Individual bestOnFullData(Individual[][] islandPopulations,
-            Evaluator evaluator,
-            EvaluationData evaluationData,
-            int[] rowIndices) {
-        Individual best = null;
-        for (Individual[] islandPopulation : islandPopulations) {
-            for (Individual individual : islandPopulation) {
-                double fullFitness = evaluator.evaluate(individual.chromosome(), evaluationData, rowIndices);
-                Individual rescored = new Individual(individual.chromosome(), fullFitness);
-                if (best == null || rescored.fitness() < best.fitness()) {
-                    best = rescored;
-                }
-            }
-        }
-        return best;
     }
 }
